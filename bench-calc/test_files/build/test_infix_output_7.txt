@@ -1,1 +1,1 @@
-Result is -nan
+Result is 15.000000
