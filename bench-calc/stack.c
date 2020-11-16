@@ -17,12 +17,12 @@ struct double_stack *double_stack_new(int max_size) {
 
 // push a value onto the stack
 void double_stack_push(struct double_stack *this, double value) {
-    this -> items[this->top] = value;
-    this -> top++;
+    this->items[this->top] = value;
+    this->top++;
 }
 
 // pop a value from the stack
 double double_stack_pop(struct double_stack *this) {
-    this -> top -= 1;
-    return this -> items[this -> top];
+    this->top -= 1;
+    return this->items[this->top];
 }
