@@ -1,2 +1,3 @@
 # Ignore Submission Files
 *.tar
+.DS_Store
