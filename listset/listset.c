@@ -41,12 +41,14 @@ void listset_add(struct listset *this, char *item) {
 
 // remove an item with number 'item' from the set
 void listset_remove(struct listset *this, char *item) {
-    struct listnode *selected = this->head;
-    while (selected != NULL) {
-        if (strcmp(selected->next->str, item) == 0) {
-            selected->next = selected->next->next;
+    if (listset_lookup(this, item) == 1) {
+        for (struct listnode *selected = this->head; selected != NULL; selected = selected->next) {
+            if (selected->next != NULL) {
+                if (strcmp(selected->next->str, item) == 0) {
+                    selected->next = selected->next->next;
+                }
+            }
         }
-        selected = selected->next;
     }
 }
 
