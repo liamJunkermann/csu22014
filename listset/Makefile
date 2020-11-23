@@ -13,3 +13,6 @@ test:
 	echo "Debug"
 	cc -g listset-main.c listset.c listset.h -I. -o listset
 	./listset + knife + spoon + fork + no - knife + is + there - fork =
+
+submission_archive:
+	tar -cvf listset_submission.tar *.h *.c
