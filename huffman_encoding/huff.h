@@ -39,12 +39,10 @@ void huffcoder_count(struct huffcoder *this, char *filename);
 void huffcoder_build_tree(struct huffcoder *this);
 
 void fillTree(struct huffchar **nodes, struct huffcoder *this);
-struct huffchar *getLeastFrequent(struct huffchar **nodes, int size);
 
 // using the Huffman tree, build a table of the Huffman codes
 // with the huffcoder object
 void huffcoder_tree2table(struct huffcoder *this);
-void huffcoder_tree2table_rec(struct huffcoder *this, struct huffchar *node, int *path, int depth);
 
 // print the Huffman codes for each character in order
 void huffcoder_print_codes(struct huffcoder *this);
