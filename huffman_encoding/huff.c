@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "huff.h"
 
@@ -36,6 +37,20 @@ void huffcoder_count(struct huffcoder *this, char *filename) {
     fclose(file);
 }
 
+struct huffchar *getLeastFrequent(struct huffchar **nodes, int size) {
+    int small = 0;
+    for (int i = 0; i < size; i++) {
+        if ((nodes[i]->freq < nodes[small]->freq) || ((nodes[i]->freq == nodes[small]->freq) && (nodes[i]->seqno < nodes[small]->seqno))) {
+            small = i;
+        }
+    }
+
+    struct huffchar *returnChar = nodes[small];
+    for (int i = small; i < size; i++)
+        nodes[i] = nodes[i + 1]; // Removes smallest node
+    return returnChar;
+}
+
 void fillTree(struct huffchar **nodes, struct huffcoder *this) {
     int space = NUM_CHARS;
     for (int i = 0; space > 1; i++) {
@@ -52,20 +67,6 @@ void fillTree(struct huffchar **nodes, struct huffcoder *this) {
     this->tree = nodes[0];
 }
 
-struct huffchar *getLeastFrequent(struct huffchar **nodes, int size) {
-    int small = 0;
-    for (int i = 0; i < size; i++) {
-        if ((nodes[i]->freq < nodes[small]->freq) || ((nodes[i]->freq == nodes[small]->freq) && (nodes[i]->seqno < nodes[small]->seqno))) {
-            small = i;
-        }
-    }
-
-    struct huffchar *returnChar = nodes[small];
-    for (int i = small; i < size; i++)
-        nodes[i] = nodes[i + 1]; // Removes smallest node
-    return returnChar;
-}
-
 // using the character frequencies build the tree of compound
 // and simple characters that are used to compute the Huffman codes
 void huffcoder_build_tree(struct huffcoder *this) {
@@ -80,28 +81,15 @@ void huffcoder_build_tree(struct huffcoder *this) {
     fillTree(node, this);
 }
 
-void huffcoder_tree2table_rec(struct huffcoder *this, struct huffchar *node, int *path, int depth) {
-    if (node->is_compound) {
-        // Handle if it is a compound
-        int *temp = malloc(sizeof(int) * depth + 1);
-        for (int i = 0; i < depth; i++) {
-            temp[i] = path[i];
-        }
-        temp[depth] = 0;
-        if (node->u.compound.left != NULL) {
-            huffcoder_tree2table_rec(this, node->u.compound.left, temp, depth + 1);
-        }
-        if (node->u.compound.right != NULL) {
-            huffcoder_tree2table_rec(this, node->u.compound.right, temp, depth + 1);
-        }
+void huffcoder_tree2table_rec(struct huffcoder *this, struct huffchar *node, int length, unsigned code) {
+    if ((node->is_compound) == (int)1) {
+        huffcoder_tree2table_rec(this, node->u.compound.left, length + 1, code);
+        code = code | ((unsigned)1 << (length));
+        huffcoder_tree2table_rec(this, node->u.compound.right, length + 1, code);
     } else {
-        // Is a char node
-        unsigned long long code = 0;
-        for (int i = 0; i < depth; i++) {
-            code = (code << 1) | path[i];
-        }
-        this->codes[node->u.c] = code;
-        this->code_lengths[node->u.c] = depth;
+        fprintf(stderr, "char: %d, code: %d\n", node->u.c, code);
+        this->codes[node->u.c] = (char *)code;
+        this->code_lengths[node->u.c] = length;
     }
 }
 
@@ -116,9 +104,23 @@ void huffcoder_tree2table(struct huffcoder *this) {
 void huffcoder_print_codes(struct huffcoder *this) {
     for (int i = 0; i < NUM_CHARS; i++) {
         // print the code
-        printf("char: %d, freq: %d, code: %s\n", i, this->freqs[i], this->codes[i]);
-        ;
+        printf("char: %d, freq: %d, code: %c\n", i, this->freqs[i], this->codes[i]);
     }
+}
+
+FILE *openFile(char *filename, char *opentype) {
+    FILE *file = NULL;
+    if (strcmp(opentype, "r")) {
+        file = fopen(filename, "r");
+        if (file == NULL) {
+            printf("Error Opening file %s, quitting\n", filename);
+            exit(1);
+        }
+    } else if (strcmp(opentype, "a")) {
+        file = fopen(filename, "a");
+    }
+
+    return file;
 }
 
 // encode the input file and write the encoding to the output file
@@ -129,31 +131,25 @@ void huffcoder_encode(struct huffcoder *this, char *input_filename,
     unsigned char c;
     while (!feof(in_file)) {
         c = fgetc(in_file);
-        fprintf(out_file, "%s", this->codes[c]);
+        printf("%s", this->codes[c]);
     }
+
+    fclose(in_file);
+    fclose(out_file);
 }
 
 // decode the input file and write the decoding to the output file
 void huffcoder_decode(struct huffcoder *this, char *input_filename,
                       char *output_filename) {
-    FILE *in_file = openFile(input_filename, "r");
-    FILE *out_file = openFile(output_filename, "a");
+    FILE *in_file = openFile((char *)input_filename, "r");
+    FILE *out_file = openFile((char *)output_filename, "a");
 
+    struct huffchar *node = this->tree;
     unsigned char c;
     while (!feof(in_file)) {
         c = fgetc(in_file);
     }
-}
 
-FILE *openFile(char *filename, char opentype) {
-    FILE *file = fopen(filename, opentype);
-    if (file == NULL) {
-        printf("Error Opening file %s, quitting\n", filename);
-        exit(1);
-    }
-
-    return file;
-}
-
-char findChar(struct huffcoder *this, char *code) {
+    fclose(in_file);
+    fclose(out_file);
 }
