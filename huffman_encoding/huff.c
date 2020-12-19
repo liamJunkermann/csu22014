@@ -17,18 +17,27 @@ struct huffcoder *huffcoder_new() {
         result->codes[i] = 0;
     }
     result->tree = malloc(sizeof(struct huffchar) * NUM_CHARS);
+    result->tree->freq = 1;
+    result->tree->is_compound = 0;
+    result->tree->seqno = 0;
+    result->tree->u.c = '\0';
+    result->tree->u.compound.left = (struct huffchar *)malloc(sizeof(struct huffchar));
+    result->tree->u.compound.right = (struct huffchar *)malloc(sizeof(struct huffchar));
+
     return result;
 }
 
 // count the frequency of characters in a file; set chars with zero
 // frequency to one
 void huffcoder_count(struct huffcoder *this, char *filename) {
-    unsigned char c;
     FILE *file = fopen(filename, "r");
-    assert(file != NULL);
+    unsigned char c;
+    fprintf(stderr, "Printing Counts\n");
     while (!feof(file)) {
         c = fgetc(file);
-        this->freqs[c] += 1;
+        fprintf(stderr, "char: %d\n", c);
+        this->freqs[(int)c]++;
+        // fprintf(stderr, "Char: %c, freq: %d\n", c, this->freqs[(int)c]);
     }
     for (int i = 0; i < NUM_CHARS; i++) {
         if (this->freqs[i] == 0)
@@ -37,30 +46,36 @@ void huffcoder_count(struct huffcoder *this, char *filename) {
     fclose(file);
 }
 
-struct huffchar *getLeastFrequent(struct huffchar **nodes, int size) {
-    int small = 0;
+// finds, removes and returns the least frequent node
+struct huffchar *getSmallest(struct huffchar **nodes, int size) {
+    int smallest = 0;
     for (int i = 0; i < size; i++) {
-        if ((nodes[i]->freq < nodes[small]->freq) || ((nodes[i]->freq == nodes[small]->freq) && (nodes[i]->seqno < nodes[small]->seqno))) {
-            small = i;
+        if (nodes[i]->freq < nodes[smallest]->freq) { // if no smaller, lowest index
+            smallest = i;
+        } else if ((nodes[i]->freq == nodes[smallest]->freq) && (nodes[i]->seqno < nodes[smallest]->seqno)) {
+            smallest = i;
         }
     }
-
-    struct huffchar *returnChar = nodes[small];
-    for (int i = small; i < size; i++)
-        nodes[i] = nodes[i + 1]; // Removes smallest node
-    return returnChar;
+    struct huffchar *to_return = nodes[smallest];
+    // removes node
+    for (int index = smallest; index < size; index++) {
+        nodes[index] = nodes[index + 1];
+    }
+    return to_return;
 }
 
-void fillTree(struct huffchar **nodes, struct huffcoder *this) {
+// completes the huffman tree
+void finishTree(struct huffchar **nodes, struct huffcoder *this) {
     int space = NUM_CHARS;
-    for (int i = 0; space > 1; i++) {
-        struct huffchar *s1 = getLeastFrequent(nodes, space--);
-        struct huffchar *s2 = getLeastFrequent(nodes, space);
+    int n = 0;
+    while (space > 1) {
+        struct huffchar *small1 = getSmallest(nodes, space--);
+        struct huffchar *small2 = getSmallest(nodes, space);
         struct huffchar *combined = malloc(sizeof(struct huffchar));
-        combined->freq = (s1->freq) + (s2->freq);
-        combined->seqno = NUM_CHARS + i;
-        combined->u.compound.left = s1;
-        combined->u.compound.right = s2;
+        combined->freq = (small1->freq) + (small2->freq);
+        combined->seqno = NUM_CHARS + n++;
+        combined->u.compound.left = small1;
+        combined->u.compound.right = small2;
         combined->is_compound = 1;
         nodes[space - 1] = combined;
     }
@@ -70,25 +85,39 @@ void fillTree(struct huffchar **nodes, struct huffcoder *this) {
 // using the character frequencies build the tree of compound
 // and simple characters that are used to compute the Huffman codes
 void huffcoder_build_tree(struct huffcoder *this) {
-    struct huffchar *node[NUM_CHARS];
+    fprintf(stderr, "Building Tree\n");
+    struct huffchar *nodes[NUM_CHARS];
     for (int i = 0; i < NUM_CHARS; i++) {
-        node[i] = malloc(sizeof(struct huffchar *));
-        node[i]->freq = this->freqs[i];
-        node[i]->u.c = i;
-        node[i]->seqno = i;
-        node[i]->is_compound = 0;
+        nodes[i] = malloc(sizeof(struct huffchar *));
+        nodes[i]->freq = this->freqs[i];
+        nodes[i]->u.c = i;
+        nodes[i]->seqno = i;
+        nodes[i]->is_compound = 0;
     }
-    fillTree(node, this);
+
+    fprintf(stderr, "Finishing Tree\n");
+    finishTree(nodes, this);
 }
 
-void huffcoder_tree2table_rec(struct huffcoder *this, struct huffchar *node, int length, unsigned code) {
+char toBinaryString(unsigned long long code, int length) {
+    char *buffer[length + 1];
+    int i;
+    for (i = 0; i < length; i++) {
+        buffer[i] = (char)((code >> i) & 1) + '0';
+    }
+    buffer[i] = '\0';
+    return buffer;
+}
+
+void huffcoder_tree2table_rec(struct huffcoder *this, struct huffchar *node, int length, unsigned long long code) {
     if ((node->is_compound) == (int)1) {
         huffcoder_tree2table_rec(this, node->u.compound.left, length + 1, code);
-        code = code | ((unsigned)1 << (length));
+        code = code | ((unsigned long long)1 << (length));
         huffcoder_tree2table_rec(this, node->u.compound.right, length + 1, code);
     } else {
-        fprintf(stderr, "char: %d, code: %d\n", node->u.c, code);
-        this->codes[node->u.c] = (char *)code;
+        char *binaryChar = toBinaryString(code, length);
+        this->codes[node->u.c] = binaryChar;
+        fprintf(stderr, "char: %d - %c, code: %s\n", node->u.c, node->u.c, this->codes[node->u.c]);
         this->code_lengths[node->u.c] = length;
     }
 }
@@ -104,7 +133,7 @@ void huffcoder_tree2table(struct huffcoder *this) {
 void huffcoder_print_codes(struct huffcoder *this) {
     for (int i = 0; i < NUM_CHARS; i++) {
         // print the code
-        printf("char: %d, freq: %d, code: %c\n", i, this->freqs[i], this->codes[i]);
+        printf("char: %d, freq: %d, code: %s\n", i, this->freqs[i], this->codes[i]);
     }
 }
 

@@ -19,7 +19,6 @@ int main(int argc, char **argv) {
     }
 
     if (strcmp(argv[1], "showcodes") == 0) {
-        fprintf(stderr, "Checking Showcodes\n");
         valid_command = 1;
         if (argc != 3) {
             fprintf(stderr, "Fatal: Exactly one filename must be passed for showcodes\n");
@@ -41,24 +40,19 @@ int main(int argc, char **argv) {
     }
 
     // create a new huffcoder structure
-    fprintf(stderr, "Creating new coder\n");
     coder = huffcoder_new();
 
     // find character frequencies using the training file
-    fprintf(stderr, "Counts\n");
     huffcoder_count(coder, argv[2]);
 
     // build the Huffman tree
-    fprintf(stderr, "Build Tree\n");
     huffcoder_build_tree(coder);
 
     // from the Huffman tree fill the table with Huffman codes
-    fprintf(stderr, "tree 2 table\n");
     huffcoder_tree2table(coder);
 
     if (strcmp(argv[1], "showcodes") == 0) {
         // print the Huffman codes
-        fprintf(stderr, "Show codes\n");
         huffcoder_print_codes(coder);
     } else if (strcmp(argv[1], "encode") == 0) {
         huffcoder_encode(coder, argv[3], argv[4]);
