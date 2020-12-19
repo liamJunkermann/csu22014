@@ -157,6 +157,14 @@ void huffcoder_decode(struct huffcoder *this, char *input_filename,
     unsigned char c;
     while (!feof(in_file)) {
         c = fgetc(in_file);
+        if (strcmp("1", c) == 0)
+            node = node->u.compound.left;
+        else
+            node = node->u.compound.right;
+        if (node->is_compound == 1) {
+        } else {
+            fputc(node->u.c, out_file);
+        }
     }
 
     fclose(in_file);
